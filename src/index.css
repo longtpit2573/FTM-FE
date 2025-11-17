@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@import 'react-loading-skeleton/dist/skeleton.css';
+
+
+body {
+  @apply font-sans;
+}
+
+
+
+
