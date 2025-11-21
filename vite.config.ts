@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: './',  // Dùng relative paths thay vì absolute
   plugins: [
     react(),
     tailwindcss(),
