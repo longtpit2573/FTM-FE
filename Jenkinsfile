@@ -49,16 +49,35 @@ pipeline {
         
         stage('🐳 Build & Push Docker Image') {
             steps {
-                echo 'Building and pushing Docker image...'
-                echo "Note: This requires Docker to be available in Jenkins agent pod"
-                echo "Image will be built: ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                echo 'Building Docker image...'
+                script {
+                    // Check if docker is available
+                    def dockerAvailable = sh(script: 'command -v docker', returnStatus: true) == 0
+                    
+                    if (!dockerAvailable) {
+                        error "Docker is not available in Jenkins agent. Please install Docker or use docker-builder agent."
+                    }
+                    
+                    dir('FTM-FE') {
+                        sh """
+                            # Build image
+                            docker build -t ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
+                            docker tag ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${ACR_REGISTRY}/${IMAGE_NAME}:latest
+                        """
+                    }
+                }
                 
-                // For now, skip actual build - will be done manually
-                echo '⚠️  Docker not available in current agent'
-                echo 'Manual build required:'
-                echo "  cd ${BUILD_CONTEXT}"
-                echo "  docker build -t ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ."
-                echo "  docker push ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                echo 'Pushing to ACR...'
+                withCredentials([usernamePassword(credentialsId: 'acr-frontend-credentials',
+                                                  usernameVariable: 'ACR_USER',
+                                                  passwordVariable: 'ACR_PASS')]) {
+                    sh """
+                        echo ${ACR_PASS} | docker login ${ACR_REGISTRY} --username ${ACR_USER} --password-stdin
+                        docker push ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${ACR_REGISTRY}/${IMAGE_NAME}:latest
+                    """
+                }
+                echo "✅ Image pushed: ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
             }
         }
         
