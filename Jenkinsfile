@@ -54,6 +54,19 @@ pipeline {
                 echo 'Building Docker image...'
                 container('docker') {
                     script {
+                        // Wait for Docker daemon to be ready
+                        sh """
+                            echo "Waiting for Docker daemon..."
+                            for i in {1..30}; do
+                                if docker info >/dev/null 2>&1; then
+                                    echo "Docker daemon is ready!"
+                                    break
+                                fi
+                                echo "Waiting for Docker daemon to start (attempt \$i/30)..."
+                                sleep 2
+                            done
+                        """
+                        
                         dir('FTM-FE') {
                             sh """
                                 # Build image
