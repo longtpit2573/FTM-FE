@@ -1,7 +1,9 @@
 // Jenkinsfile for FTM Frontend (React + Vite)
 pipeline {
-    agent any
-    
+    agent {
+        label 'docker-builder'
+    }
+
     environment {
         // ACR Configuration
         ACR_NAME = 'acrftmfrontenddev'
@@ -50,37 +52,40 @@ pipeline {
         stage('🐳 Build & Push Docker Image') {
             steps {
                 echo 'Building Docker image...'
-                script {
-                    dir('FTM-FE') {
+                container('docker') {
+                    script {
+                        dir('FTM-FE') {
+                            sh """
+                                # Build image
+                                docker build -t ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
+                                docker tag ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${ACR_REGISTRY}/${IMAGE_NAME}:latest
+                            """
+                        }
+                    }
+                    
+                    echo 'Pushing to ACR...'
+                    withCredentials([usernamePassword(credentialsId: 'acr-frontend-credentials',
+                                                      usernameVariable: 'ACR_USER',
+                                                      passwordVariable: 'ACR_PASS')]) {
                         sh """
-                            # Build image
-                            docker build -t ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
-                            docker tag ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${ACR_REGISTRY}/${IMAGE_NAME}:latest
+                            echo ${ACR_PASS} | docker login ${ACR_REGISTRY} --username ${ACR_USER} --password-stdin
+                            docker push ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                            docker push ${ACR_REGISTRY}/${IMAGE_NAME}:latest
                         """
                     }
+                    echo "✅ Image pushed: ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
                 }
-                
-                echo 'Pushing to ACR...'
-                withCredentials([usernamePassword(credentialsId: 'acr-frontend-credentials',
-                                                  usernameVariable: 'ACR_USER',
-                                                  passwordVariable: 'ACR_PASS')]) {
-                    sh """
-                        echo ${ACR_PASS} | docker login ${ACR_REGISTRY} --username ${ACR_USER} --password-stdin
-                        docker push ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-                        docker push ${ACR_REGISTRY}/${IMAGE_NAME}:latest
-                    """
-                }
-                echo "✅ Image pushed: ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
             }
         }
         
         stage('📝 Update GitOps') {
             steps {
                 echo 'Updating GitOps repository...'
-                withCredentials([usernamePassword(credentialsId: 'git-credentials', 
-                                                  usernameVariable: 'GIT_USER', 
-                                                  passwordVariable: 'GIT_PASS')]) {
-                    sh '''
+                container('kubectl') {
+                    withCredentials([usernamePassword(credentialsId: 'git-credentials', 
+                                                      usernameVariable: 'GIT_USER', 
+                                                      passwordVariable: 'GIT_PASS')]) {
+                        sh '''
                         # Install kustomize if not exists
                         if [ ! -f ./kustomize ]; then
                             curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
@@ -107,10 +112,11 @@ pipeline {
                         git add kustomization.yaml
                         git commit -m "chore: update frontend image to ${IMAGE_TAG} [skip ci]" || echo "No changes to commit"
                         git push https://${GIT_USER}:${GIT_PASS}@github.com/longtpit2573/Infrastructure.git main
-                    '''
+                        '''
+                    }
+                    echo '✅ GitOps repo updated'
+                    echo 'ArgoCD will auto-sync in ~3 minutes'
                 }
-                echo '✅ GitOps repo updated'
-                echo 'ArgoCD will auto-sync in ~3 minutes'
             }
         }
     }
