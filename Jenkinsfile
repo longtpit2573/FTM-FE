@@ -74,13 +74,16 @@ pipeline {
                             curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
                         fi
                         
+                        # Save absolute path
+                        KUSTOMIZE_PATH=$(pwd)/kustomize
+                        
                         # Clone GitOps repo (git should be available in default agent)
                         rm -rf gitops
                         git clone https://${GIT_USER}:${GIT_PASS}@github.com/longtpit2573/Infrastructure.git gitops
                         cd gitops/${GITOPS_PATH}
                         
-                        # Update image tag
-                        ../../../kustomize edit set image ${ACR_REGISTRY}/${IMAGE_NAME}=${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                        # Update image tag with absolute path
+                        ${KUSTOMIZE_PATH} edit set image ${ACR_REGISTRY}/${IMAGE_NAME}=${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
                         
                         # Show changes
                         echo "Changes to kustomization.yaml:"
