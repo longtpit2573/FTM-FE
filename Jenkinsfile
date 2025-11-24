@@ -69,14 +69,12 @@ pipeline {
                                                   usernameVariable: 'GIT_USER', 
                                                   passwordVariable: 'GIT_PASS')]) {
                     sh '''
-                        # Install git and kustomize if not exists
-                        command -v git >/dev/null 2>&1 || apt-get update -qq && apt-get install -y -qq git
-                        
+                        # Install kustomize if not exists
                         if [ ! -f ./kustomize ]; then
                             curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
                         fi
                         
-                        # Clone GitOps repo
+                        # Clone GitOps repo (git should be available in default agent)
                         rm -rf gitops
                         git clone https://${GIT_USER}:${GIT_PASS}@github.com/longtpit2573/Infrastructure.git gitops
                         cd gitops/${GITOPS_PATH}
