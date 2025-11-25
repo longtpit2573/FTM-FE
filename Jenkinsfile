@@ -74,11 +74,14 @@ pipeline {
                                 # Create Docker config.json for Kaniko
                                 mkdir -p /kaniko/.docker
                                 
+                                # Encode credentials properly (base64 without newlines)
+                                AUTH=\$(printf "%s:%s" "\${ACR_USER}" "\${ACR_PASS}" | base64 -w 0)
+                                
                                 cat > /kaniko/.docker/config.json <<EOF
 {
   "auths": {
     "${ACR_REGISTRY}": {
-      "auth": "\$(echo -n "\${ACR_USER}:\${ACR_PASS}" | base64)"
+      "auth": "\${AUTH}"
     }
   }
 }
@@ -89,27 +92,28 @@ EOF
                         }
                         
                         // Build and push with Kaniko
-                        dir('FTM-FE') {
-                            sh """
-                                echo "Building and pushing frontend image with Kaniko..."
-                                echo "Image: ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-                                echo "Context: \$(pwd)"
-                                
-                                /kaniko/executor \\
-                                  --context=. \\
-                                  --dockerfile=Dockerfile \\
-                                  --destination=${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \\
-                                  --destination=${ACR_REGISTRY}/${IMAGE_NAME}:latest \\
-                                  --cache=true \\
-                                  --cache-ttl=24h \\
-                                  --compressed-caching=false \\
-                                  --snapshot-mode=redo \\
-                                  --log-format=text \\
-                                  --verbosity=info
-                                
-                                echo "✅ Frontend image built and pushed successfully with Kaniko"
-                            """
-                        }
+                        sh """
+                            echo "Building and pushing frontend image with Kaniko..."
+                            echo "Image: ${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                            echo "Build context: \$(pwd)"
+                            
+                            # Verify Dockerfile exists
+                            ls -la Dockerfile
+                            
+                            /kaniko/executor \\
+                              --context=\$(pwd) \\
+                              --dockerfile=\$(pwd)/Dockerfile \\
+                              --destination=${ACR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \\
+                              --destination=${ACR_REGISTRY}/${IMAGE_NAME}:latest \\
+                              --cache=true \\
+                              --cache-ttl=24h \\
+                              --compressed-caching=false \\
+                              --snapshot-mode=redo \\
+                              --log-format=text \\
+                              --verbosity=info
+                            
+                            echo "✅ Frontend image built and pushed successfully with Kaniko"
+                        """
                     }
                 }
             }
