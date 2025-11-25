@@ -64,7 +64,7 @@ pipeline {
                         
                         // Get ACR credentials and create Docker config
                         withCredentials([usernamePassword(
-                            credentialsId: 'acr-frontend-credentials',
+                            credentialsId: 'acr-credentials',
                             usernameVariable: 'ACR_USER',
                             passwordVariable: 'ACR_PASS'
                         )]) {
